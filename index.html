@@ -1,0 +1,101 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="icon" href="data:">
+<title>reflexgame VR/AR</title>
+</head>
+<body style="margin: 0; background-color: #888888;">
+
+<!-- Import maps polyfill -->
+<!-- Remove this when import maps will be widely supported -->
+<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+<script type="importmap">
+{
+	"imports": {
+		"three": "https://code4fukui.github.io/three.js/build/three.module.js",
+		"three/addons/": "https://code4fukui.github.io/three.js/examples/jsm/"
+	}
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { AR } from "./AR.mjs";
+import { createTextMesh } from "./createTextMesh.mjs";
+import { sleep } from "https://js.sabae.cc/sleep.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+export const createNumSphere4 = (str, size, color) => {
+  const g = new THREE.Group();
+  const geo = new THREE.SphereGeometry(size, 15, 32);
+  const mat = new THREE.MeshBasicMaterial({ color, opacity: 0.6, transparent: true });
+  const mesh = new THREE.Mesh(geo, mat);
+  g.add(mesh);
+  const txt = createTextMesh(str, 0, 0, 0, 0x000000);
+  g.add(txt);
+  return g;
+};
+
+class reflexgame extends AR {
+  async main() {
+    const tz = -1.5;
+    const size = 0.1;
+
+    // 環境光
+    const ambientLight = new THREE.AmbientLight(0xcccccc, 0.5);
+    // 太陽光
+    const light = new THREE.DirectionalLight(0xFFFFFF, 1);
+    // ポイントライト
+    const pointLight = new THREE.PointLight(0xffffff, 0.8);
+
+    //YES用（コンテニュー時）
+    const retposi = new THREE.Vector3(-0.4, -0.3, -0.5);
+    const retry = createNumSphere4("オン", size, 0x00ffff);
+    retry.position.copy(retposi);
+
+    //NO用（コンテニュー時）
+    const finposi = new THREE.Vector3(0.4, -0.3, -0.5);
+    const finish = createNumSphere4("オフ", size, 0xFF0000);
+    finish.position.copy(finposi);
+
+    const self = this;
+    const loader = new GLTFLoader();
+    loader.load( "./GLTF/tacowase.glb", function ( gltf ) {
+      const model = gltf.scene; // 読み込んだモデルのシーングラフを取得
+      // 3Dモデルの位置を変更する（例: x軸方向に2単位、y軸方向に3単位、z軸方向に1単位移動）
+      model.position.set(0, 0, -0.5);
+      self.scene.add(model);
+    }, undefined, function ( error ) {
+      console.error( error );
+    } );
+
+    const title  = createTextMesh("これなーんだ？", 0, 0.2, tz);
+    this.scene.add(title);
+    this.scene.add(finish);
+    this.scene.add(retry);
+
+    A: for (;;) {
+        await sleep(1000 / 60);
+        for (let i = 0; i < this.ctrls.length; i++) {
+            const ctrl = this.ctrls[i];
+            const hp = new THREE.Vector3();
+            hp.setFromMatrixPosition(ctrl.matrixWorld);
+            let on = hp.distanceTo(retposi);
+            let off = hp.distanceTo(finposi);
+            if (on <= size * 1.2) {
+              this.scene.add(ambientLight); 
+              this.scene.add(light); 
+              this.scene.add(pointLight);
+            }
+            if (off <= size * 1.2) {
+              this.scene.remove(ambientLight); 
+              this.scene.remove(light); 
+              this.scene.remove(pointLight);
+            }
+        }
+      }
+  }
+}
+await new reflexgame().init();
+
+</script>
+</body>
+</html>
